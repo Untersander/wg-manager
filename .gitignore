@@ -1,35 +1,4 @@
-# Rust
-/target/
-**/*.rs.bk
-*.pdb
-Cargo.lock
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-.DS_Store
-
-# WireGuard configurations (sensitive)
-/wireguard/
-*.conf
-*.key
-
-# Configuration files (may contain passwords)
-/config/
-config.toml
-
-# nftables
-/nftables/
-
-# Docker
-.dockerignore
-
-# Logs
+bin/
+.tmp/
 *.log
-
-# Environment files
 .env
-.env.local

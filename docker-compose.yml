@@ -1,63 +1,29 @@
 services:
   wg-manager:
     build: .
-    image: wg-manager:latest
+    privileged: true
     container_name: wg-manager
-    restart: unless-stopped
-
-    # Required for WireGuard and nftables
-    # Note: For full WireGuard support, you may need to use privileged: true
-    # or ensure the host kernel has WireGuard support and proper capabilities
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
-      - NET_RAW
-
     sysctls:
       - net.ipv4.ip_forward=1
       - net.ipv6.conf.all.forwarding=1
-
-    # Use host network mode for best WireGuard support (alternative to bridge below)
-    # Uncomment the following line if you need full host network access:
-    # network_mode: host
-
-    # Use bridge mode with proper port mappings (default)
-    network_mode: bridge
-
-    ports:
-      - "8080:8080"      # Web UI
-      - "51820:51820/udp" # WireGuard (adjust as needed)
-
-    volumes:
-      # WireGuard configuration
-      - ./wireguard:/etc/wireguard
-      # Optional: custom configuration
-      - ./config:/etc/wg-manager
-      # Persist nftables rules (optional)
-      - ./nftables:/etc/nftables
-
     environment:
-      # Authentication credentials
-      - WG_USERNAME=admin
-      - WG_PASSWORD=changeme
-      # WireGuard configuration directory
-      - WG_CONFIG_DIR=/etc/wireguard
-      # Logging level
-      - RUST_LOG=wg_manager=info,tower_http=info
-
-    # Security options
-    security_opt:
-      - no-new-privileges:true
-
-    # Uncomment below for full privileged mode (easier but less secure)
-    # privileged: true
-
-    # Read-only root filesystem (except volumes) - disabled due to WireGuard needs
-    # read_only: true
-    # tmpfs:
-    #   - /tmp
-
-# Optional: create a dedicated network
-# networks:
-#   wg-network:
-#     driver: bridge
+      WG_PASSWORD: change-me
+      WG_HOST: vpn.example.com
+      WG_PORT: "51820"
+      WG_MTU: "1420"
+      WG_INTERFACE_NAME: wg0
+      WG_EGRESS_INTERFACE: eth0
+      WG_CONFIG_PATH: /etc/wireguard/wg0.conf
+      WG_ALLOWED_IPS: 0.0.0.0/0,::/0
+      WG_CLIENT_DNS: 1.1.1.1,2606:4700:4700::1111
+      WG_PERSISTENT_KEEPALIVE: "25"
+      HTTP_ADDR: :8080
+    ports:
+      - "8080:8080/tcp"
+      - "51820:51820/udp"
+    volumes:
+      - ./data/wireguard:/etc/wireguard
+    restart: unless-stopped

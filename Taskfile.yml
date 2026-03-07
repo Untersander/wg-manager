@@ -1,0 +1,104 @@
+# https://taskfile.dev
+version: "3"
+
+vars:
+  BINARY: wg-manager
+  IMAGE: wg-manager
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list-all
+
+  # ── Development ──
+
+  build:
+    desc: Build the Go binary locally
+    cmds:
+      - go build -o bin/{{.BINARY}} ./cmd/wg-manager
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+
+  fmt:
+    desc: Run gofmt
+    cmds:
+      - gofmt -w .
+
+  tidy:
+    desc: Run go mod tidy
+    cmds:
+      - go mod tidy
+
+  lint:
+    desc: Run vet + fmt check
+    cmds:
+      - task: vet
+      - gofmt -l . | grep . && echo "files need formatting" && exit 1 || true
+
+  check:
+    desc: Run tidy, vet, and build
+    cmds:
+      - task: tidy
+      - task: vet
+      - task: build
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - rm -rf bin/
+
+  # ── Docker ──
+
+  up:
+    desc: Build and start docker-compose stack
+    cmds:
+      - docker compose up --build -d
+
+  down:
+    desc: Stop docker-compose stack
+    cmds:
+      - docker compose down
+
+  restart:
+    desc: Restart docker-compose stack
+    cmds:
+      - docker compose restart
+
+  logs:
+    desc: Tail docker-compose logs
+    cmds:
+      - docker compose logs -f
+
+  ps:
+    desc: Show running containers
+    cmds:
+      - docker compose ps
+
+  docker-build:
+    desc: Build the Docker image only
+    cmds:
+      - docker build -t {{.IMAGE}} .
+
+  docker-clean:
+    desc: Stop stack and remove volumes
+    cmds:
+      - docker compose down -v
+
+  watch:
+    desc: Watch for changes and rebuild/restart the docker-compose stack
+    watch: true
+    sources:
+      - "cmd/**/*.go"
+      - "internal/**/*.go"
+      - "web/**/*"
+      - "docker/**/*"
+      - Dockerfile
+      - docker-compose.yml
+      - go.mod
+      - go.sum
+    cmds:
+      - docker compose up --build

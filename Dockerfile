@@ -1,59 +1,19 @@
-# Build stage
-FROM rust:1.94-alpine AS builder
+# syntax=docker/dockerfile:1
 
-# Install build dependencies
-RUN apk add --no-cache musl-dev
+FROM golang:1.25-alpine AS build
+WORKDIR /src
+COPY go.mod ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/wg-manager ./cmd/wg-manager
 
-# Create app directory
-WORKDIR /app
-
-# Copy manifests
-COPY Cargo.toml ./
-
-# Create a dummy main.rs to build dependencies
-RUN mkdir src && \
-    echo "fn main() {}" > src/main.rs && \
-    cargo build --release && \
-    rm -rf src
-
-# Copy source code
-COPY src ./src
-COPY templates ./templates
-
-# Build the application
-RUN touch src/main.rs && \
-    cargo build --release
-
-# Runtime stage
 FROM alpine:3.23
-
-# Install runtime dependencies
-RUN apk add --no-cache \
-    wireguard-tools \
-    nftables \
-    iptables \
-    ip6tables \
-    iproute2 \
-    bash
-
-# Create necessary directories
-RUN mkdir -p /etc/wireguard /etc/wg-manager
-
-# Copy the binary from builder
-COPY --from=builder /app/target/release/wg-manager /usr/local/bin/wg-manager
-
-# Copy entrypoint script
-COPY entrypoint.sh /entrypoint.sh
+RUN apk add --no-cache wireguard-tools nftables iproute2 ca-certificates
+COPY --from=build /out/wg-manager /usr/local/bin/wg-manager
+COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-
-# Set environment variables
-ENV WG_USERNAME=admin \
-    WG_PASSWORD=admin \
-    WG_CONFIG_DIR=/etc/wireguard
-
-# Expose port
-EXPOSE 8080
-
-# Set entrypoint
+WORKDIR /app
+COPY web /app/web
+EXPOSE 8080/udp
+EXPOSE 8080/tcp
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["/usr/local/bin/wg-manager"]
