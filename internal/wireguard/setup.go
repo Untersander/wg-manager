@@ -22,20 +22,7 @@ func EnableIPForwarding() error {
 }
 
 func EnsureConfig(path string, listenPort, mtu int, subnetV4, subnetV6 string) error {
-	if _, err := os.Stat(path); err == nil {
-		return nil
-	}
-
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
-
-	privKey, err := runCmd("wg", "genkey")
-	if err != nil {
-		return fmt.Errorf("generating server key: %w", err)
-	}
-
-	// Get first usable IP from each subnet for server address
+	// Get expected server addresses from subnets
 	serverAddrV4, err := firstUsableIP(subnetV4)
 	if err != nil {
 		return fmt.Errorf("invalid IPv4 subnet: %w", err)
@@ -43,6 +30,46 @@ func EnsureConfig(path string, listenPort, mtu int, subnetV4, subnetV6 string) e
 	serverAddrV6, err := firstUsableIP(subnetV6)
 	if err != nil {
 		return fmt.Errorf("invalid IPv6 subnet: %w", err)
+	}
+
+	// If config exists, check if subnet addresses need updating
+	if _, err := os.Stat(path); err == nil {
+		cfg, loadErr := LoadConfig(path)
+		if loadErr != nil {
+			return fmt.Errorf("loading existing config: %w", loadErr)
+		}
+
+		// Check if addresses need updating
+		expectedAddrs := []string{serverAddrV4, serverAddrV6}
+		needsUpdate := false
+		if len(cfg.Interface.Addresses) != 2 {
+			needsUpdate = true
+		} else {
+			for i, expected := range expectedAddrs {
+				if cfg.Interface.Addresses[i] != expected {
+					needsUpdate = true
+					break
+				}
+			}
+		}
+
+		if needsUpdate {
+			cfg.Interface.Addresses = expectedAddrs
+			if saveErr := SaveConfig(path, cfg); saveErr != nil {
+				return fmt.Errorf("updating subnet addresses in config: %w", saveErr)
+			}
+		}
+		return nil
+	}
+
+	// Config doesn't exist, create new one
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+
+	privKey, err := runCmd("wg", "genkey")
+	if err != nil {
+		return fmt.Errorf("generating server key: %w", err)
 	}
 
 	content := fmt.Sprintf("[Interface]\nAddress = %s, %s\nListenPort = %d\nMTU = %d\nPrivateKey = %s\n",

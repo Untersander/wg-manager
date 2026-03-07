@@ -80,6 +80,7 @@ templ peerRow(p PeerView) {
 				<span class="icon icon-edit"></span>
 			</a>
 			<form method="post" action={ templ.SafeURL("/peers/" + p.Name + "/delete") } style="display:inline">
+				@csrfInput()
 				<button type="submit" class="icon-btn icon-btn-danger" title="Delete" data-name={ p.Name } onclick="return confirm('Delete ' + this.dataset.name + '?')">
 					<span class="icon icon-delete"></span>
 				</button>
