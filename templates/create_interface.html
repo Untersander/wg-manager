@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Create Interface - WireGuard Manager{% endblock %}
+
+{% block content %}
+<h2>Create New WireGuard Interface</h2>
+
+<div class="info-box">
+    <strong>About WireGuard Interfaces:</strong><br>
+    A WireGuard interface is a virtual network interface that will handle VPN traffic.
+    You can have multiple interfaces, each with its own configuration and peers.
+</div>
+
+<form method="post" action="/interfaces/create">
+    <div class="form-group">
+        <label for="name">Interface Name *</label>
+        <input type="text" id="name" name="name" required placeholder="wg0, wg1, vpn0, etc" pattern="[a-zA-Z0-9_]+">
+        <p style="color: #6c757d; font-size: 13px; margin-top: 3px;">
+            Must contain only letters, numbers, and underscores (no spaces or special characters)<br>
+            Examples: wg0, wg1, vpn_production, vpn_test
+        </p>
+    </div>
+
+    <div class="form-group">
+        <label for="listen_port">Listen Port *</label>
+        <input type="number" id="listen_port" name="listen_port" required placeholder="51820" min="1024" max="65535" value="51820">
+        <p style="color: #6c757d; font-size: 13px; margin-top: 3px;">
+            The UDP port that WireGuard will listen on<br>
+            Default: 51820 (change if port is already in use)
+        </p>
+    </div>
+
+    <div class="warning-box">
+        <strong>Port Note:</strong><br>
+        Make sure this port is:
+        <ul style="margin: 10px 0;">
+            <li>Not already in use by another service</li>
+            <li>Open in your firewall (if applicable)</li>
+            <li>Forwarded on your router (if hosting at home)</li>
+        </ul>
+    </div>
+
+    <button type="submit" class="btn btn-success">Create Interface</button>
+</form>
+
+<div style="margin-top: 30px;">
+    <a href="/interfaces" class="btn">Back to Interfaces</a>
+</div>
+{% endblock %}

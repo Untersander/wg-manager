@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}{{ interface.name }} - WireGuard Manager{% endblock %}
+
+{% block content %}
+<h2>Interface: {{ interface.name }}</h2>
+
+<div class="info-box">
+    <div class="stat">
+        <div class="stat-label">Public Key</div>
+        <div class="stat-value"><code>{{ interface.public_key }}</code></div>
+    </div>
+    {% if let Some(port) = interface.listen_port %}
+    <div class="stat">
+        <div class="stat-label">Listen Port</div>
+        <div class="stat-value">{{ port }}</div>
+    </div>
+    {% endif %}
+    <div class="stat">
+        <div class="stat-label">Peers Connected</div>
+        <div class="stat-value">{{ interface.peers.len() }}</div>
+    </div>
+</div>
+
+<h3>NAT/Masquerade Configuration</h3>
+
+<form method="post" action="/interfaces/{{ interface.name }}/masquerade">
+    <div class="form-group">
+        <label>
+            <input type="checkbox" name="enabled" value="1" {% if masquerade_enabled %}checked{% endif %}>
+            Enable IPv4/IPv6 masquerading (NAT) for this interface
+        </label>
+        <p style="color: #6c757d; font-size: 14px; margin-top: 5px;">
+            When enabled, traffic from WireGuard peers will be masqueraded to allow internet access.
+        </p>
+    </div>
+    <button type="submit" class="btn">Update Masquerade Settings</button>
+</form>
+
+<h3>Connected Peers ({{ interface.peers.len() }})</h3>
+
+{% if interface.peers.is_empty() %}
+<div class="warning-box">
+    No peers connected to this interface. Add a peer using the form below.
+</div>
+{% else %}
+{% for peer in interface.peers %}
+<div class="peer-card">
+    <div class="peer-header">
+        <div>
+            <strong>Public Key:</strong> <code>{{ peer.public_key }}</code>
+        </div>
+        <form method="post" action="/interfaces/{{ interface.name }}/peers/{{ peer.public_key }}/delete" style="margin: 0; padding: 0; background: none;">
+            <button type="submit" class="btn btn-danger btn-small">Remove</button>
+        </form>
+    </div>
+
+    <div style="margin-top: 10px;">
+        <strong>Allowed IPs:</strong>
+        {% for ip in peer.allowed_ips %}
+            <code>{{ ip }}</code>{% if !loop.last %}, {% endif %}
+        {% endfor %}
+    </div>
+
+    {% if let Some(endpoint) = peer.endpoint %}
+    <div style="margin-top: 5px;">
+        <strong>Endpoint:</strong> <code>{{ endpoint }}</code>
+    </div>
+    {% endif %}
+
+    {% if let Some(handshake) = peer.latest_handshake %}
+    <div style="margin-top: 5px;">
+        <strong>Latest Handshake:</strong> {{ handshake }}
+    </div>
+    {% endif %}
+
+    <div style="margin-top: 5px;">
+        <strong>Transfer:</strong>
+        RX: {{ peer.transfer_rx }} bytes |
+        TX: {{ peer.transfer_tx }} bytes
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+
+<div style="margin: 20px 0; display: flex; gap: 10px;">
+    <a href="/interfaces/{{ interface.name }}/peers/generate" class="btn btn-success">Generate New Peer</a>
+</div>
+
+<h3>Add Existing Peer</h3>
+
+<form method="post" action="/interfaces/{{ interface.name }}/peers/add">
+    <div class="form-group">
+        <label for="public_key">Public Key *</label>
+        <input type="text" id="public_key" name="public_key" required placeholder="base64-encoded-public-key">
+        <p style="color: #6c757d; font-size: 13px; margin-top: 3px;">
+            Generate with: <code>wg genkey | tee private.key | wg pubkey</code>
+        </p>
+    </div>
+
+    <div class="form-group">
+        <label for="allowed_ips">Allowed IPs *</label>
+        <input type="text" id="allowed_ips" name="allowed_ips" required placeholder="10.0.0.2/32, fd00::2/128">
+        <p style="color: #6c757d; font-size: 13px; margin-top: 3px;">
+            Comma-separated list of IP addresses/subnets this peer can use
+        </p>
+    </div>
+
+    <div class="form-group">
+        <label for="endpoint">Endpoint (optional)</label>
+        <input type="text" id="endpoint" name="endpoint" placeholder="192.168.1.100:51820">
+        <p style="color: #6c757d; font-size: 13px; margin-top: 3px;">
+            Leave empty for road warrior clients connecting to this server
+        </p>
+    </div>
+
+    <button type="submit" class="btn btn-success">Add Peer</button>
+</form>
+
+<div style="margin-top: 30px;">
+    <a href="/interfaces" class="btn">Back to Interfaces</a>
+</div>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Interfaces - WireGuard Manager{% endblock %}
+
+{% block content %}
+<h2>WireGuard Interfaces</h2>
+
+<div style="margin-bottom: 20px;">
+    <a href="/interfaces/create" class="btn btn-success">Create New Interface</a>
+</div>
+
+{% if interfaces.is_empty() %}
+<div class="warning-box">
+    <strong>No WireGuard interfaces found</strong><br>
+    Create your first interface by clicking the "Create New Interface" button above.
+</div>
+{% else %}
+<table>
+    <thead>
+        <tr>
+            <th>Interface</th>
+            <th>Public Key</th>
+            <th>Listen Port</th>
+            <th>Peers</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for interface in interfaces %}
+        <tr>
+            <td><strong>{{ interface.name }}</strong></td>
+            <td><code>{{ interface.public_key }}</code></td>
+            <td>{% if let Some(port) = interface.listen_port %}{{ port }}{% else %}-{% endif %}</td>
+            <td>{{ interface.peers.len() }}</td>
+            <td>
+                <a href="/interfaces/{{ interface.name }}" class="btn btn-small">Details</a>
+                <form method="post" action="/interfaces/{{ interface.name }}/delete" style="display: inline;">
+                    <button type="submit" class="btn btn-danger btn-small">Delete</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+<div style="margin-top: 20px;">
+    <a href="/" class="btn">Back to Dashboard</a>
+</div>
+{% endblock %}
