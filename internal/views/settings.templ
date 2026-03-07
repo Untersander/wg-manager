@@ -8,6 +8,7 @@ templ SettingsPage(data SettingsData) {
 			<section class="card">
 				<h2>Interface Settings</h2>
 				<form method="post" action="/settings">
+					@csrfInput()
 					<label>Listen Port</label>
 					<input name="listen_port" value={ strconv.Itoa(data.ListenPort) } type="number" min="1" max="65535" required/>
 					<label>MTU</label>

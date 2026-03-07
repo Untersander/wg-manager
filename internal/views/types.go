@@ -1,5 +1,18 @@
 package views
 
+import "context"
+
+type csrfKeyType struct{}
+
+var CSRFKey = csrfKeyType{}
+
+func CSRFToken(ctx context.Context) string {
+	if v, ok := ctx.Value(CSRFKey).(string); ok {
+		return v
+	}
+	return ""
+}
+
 type PeerView struct {
 	Name       string
 	AllowedIPs string

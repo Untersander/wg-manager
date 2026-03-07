@@ -1,6 +1,6 @@
 # wg-manager
 
-Minimal Go + Docker WireGuard manager with a web UI.
+Minimal Go WireGuard manager with a web UI.
 
 ## What It Does
 
@@ -24,7 +24,7 @@ Then open `http://localhost:8080`.
 
 ## Required Environment Variables
 
-- `WG_PASSWORD`: UI password.
+- `HTTP_PASSWORD`: UI password.
 - `WG_HOST`: Public hostname or IP used in client endpoint.
 
 ## Important Variables
@@ -33,7 +33,7 @@ Then open `http://localhost:8080`.
 - `WG_MTU` (default `1420`)
 - `WG_INTERFACE_NAME` (default `wg0`)
 - `WG_EGRESS_INTERFACE` (default `eth0`)
-- `WG_CONFIG_PATH` (default `/etc/wireguard/wg0.conf`)
+- `WG_CONFIG_PATH` (default `/etc/wireguard`, resulting file is `<WG_INTERFACE_NAME>.conf`)
 - `WG_ALLOWED_IPS` (default `0.0.0.0/0,::/0`)
 - `WG_CLIENT_DNS` (default `1.1.1.1,2606:4700:4700::1111`)
 - `WG_PERSISTENT_KEEPALIVE` (default `25`)

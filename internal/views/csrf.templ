@@ -1,0 +1,5 @@
+package views
+
+templ csrfInput() {
+	<input type="hidden" name="csrf_token" value={ CSRFToken(ctx) }/>
+}

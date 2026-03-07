@@ -62,8 +62,8 @@ func (a *App) Dashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	nextAddr, err := wireguard.NextAvailableAddresses(
-		a.Settings.ServerAddressV4,
-		a.Settings.ServerAddressV6,
+		a.Settings.SubnetV4,
+		a.Settings.SubnetV6,
 		cfg.Peers,
 	)
 	if err == nil {
@@ -103,6 +103,16 @@ func (a *App) CreatePeer(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/?err=name+required", http.StatusSeeOther)
 		return
 	}
+	if err := validatePeerName(name); err != nil {
+		http.Redirect(w, r, "/?err=invalid+peer+name", http.StatusSeeOther)
+		return
+	}
+	if address != "" {
+		if err := validateCIDRList(address); err != nil {
+			http.Redirect(w, r, "/?err=invalid+address", http.StatusSeeOther)
+			return
+		}
+	}
 
 	keepalive, _ := strconv.Atoi(r.FormValue("keepalive"))
 	if keepalive < 0 {
@@ -123,8 +133,8 @@ func (a *App) CreatePeer(w http.ResponseWriter, r *http.Request) {
 
 	if address == "" {
 		autoAddr, err := wireguard.NextAvailableAddresses(
-			a.Settings.ServerAddressV4,
-			a.Settings.ServerAddressV6,
+			a.Settings.SubnetV4,
+			a.Settings.SubnetV6,
 			cfg.Peers,
 		)
 		if err != nil {
@@ -238,6 +248,25 @@ func (a *App) UpdatePeer(w http.ResponseWriter, r *http.Request) {
 	dns := strings.TrimSpace(r.FormValue("dns"))
 	clientAllowedIPs := strings.TrimSpace(r.FormValue("client_allowed_ips"))
 
+	if address != "" {
+		if err := validateCIDRList(address); err != nil {
+			http.Redirect(w, r, "/peers/"+name+"?err=invalid+address", http.StatusSeeOther)
+			return
+		}
+	}
+	if dns != "" {
+		if err := validateDNSList(dns); err != nil {
+			http.Redirect(w, r, "/peers/"+name+"?err=invalid+dns", http.StatusSeeOther)
+			return
+		}
+	}
+	if clientAllowedIPs != "" {
+		if err := validateCIDRList(clientAllowedIPs); err != nil {
+			http.Redirect(w, r, "/peers/"+name+"?err=invalid+allowed+ips", http.StatusSeeOther)
+			return
+		}
+	}
+
 	cfg, err := wireguard.LoadConfig(a.Settings.ConfigPath)
 	if err != nil {
 		http.Redirect(w, r, "/peers/"+name+"?err=failed+loading+config", http.StatusSeeOther)
@@ -327,8 +356,25 @@ func (a *App) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/settings?err=egress+required", http.StatusSeeOther)
 		return
 	}
+	if err := validateInterface(egress); err != nil {
+		http.Redirect(w, r, "/settings?err=invalid+egress+interface", http.StatusSeeOther)
+		return
+	}
 	defaultDNS := strings.TrimSpace(r.FormValue("default_dns"))
 	defaultAllowedIPs := strings.TrimSpace(r.FormValue("default_allowed_ips"))
+
+	if defaultDNS != "" {
+		if err := validateDNSList(defaultDNS); err != nil {
+			http.Redirect(w, r, "/settings?err=invalid+dns", http.StatusSeeOther)
+			return
+		}
+	}
+	if defaultAllowedIPs != "" {
+		if err := validateCIDRList(defaultAllowedIPs); err != nil {
+			http.Redirect(w, r, "/settings?err=invalid+allowed+ips", http.StatusSeeOther)
+			return
+		}
+	}
 
 	cfg, err := wireguard.LoadConfig(a.Settings.ConfigPath)
 	if err != nil {
@@ -346,7 +392,7 @@ func (a *App) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/settings?err=failed+reloading+wireguard", http.StatusSeeOther)
 		return
 	}
-	if err := wireguard.ApplyMasquerade(egress); err != nil {
+	if err := wireguard.ApplyMasquerade(egress, a.Settings.SubnetV4, a.Settings.SubnetV6); err != nil {
 		http.Redirect(w, r, "/settings?err=failed+applying+nft+rules", http.StatusSeeOther)
 		return
 	}

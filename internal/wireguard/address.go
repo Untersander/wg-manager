@@ -16,8 +16,7 @@ func NextAvailableIP(serverCIDR string, usedCIDRs []string) (string, error) {
 	}
 
 	used := map[netip.Addr]bool{}
-	// mark the server's own address
-	used[prefix.Addr()] = true
+	reserveServerAddress(prefix, used)
 	for _, cidr := range usedCIDRs {
 		p, err := netip.ParsePrefix(cidr)
 		if err != nil {
@@ -122,7 +121,7 @@ func nextHost(serverCIDR string, usedCIDRs []string) (string, error) {
 	}
 
 	used := map[netip.Addr]bool{}
-	used[prefix.Addr()] = true
+	reserveServerAddress(prefix, used)
 	for _, cidr := range usedCIDRs {
 		p, err := netip.ParsePrefix(cidr)
 		if err != nil {
@@ -147,4 +146,19 @@ func nextHost(serverCIDR string, usedCIDRs []string) (string, error) {
 	}
 
 	return "", fmt.Errorf("no available IPs in %s", serverCIDR)
+}
+
+func reserveServerAddress(prefix netip.Prefix, used map[netip.Addr]bool) {
+	netAddr := networkAddress(prefix)
+	serverAddr := prefix.Addr()
+
+	// When settings provide a subnet (e.g. 10.8.0.0/24), reserve first usable
+	// because EnsureConfig assigns that to the server interface.
+	if serverAddr == netAddr {
+		serverAddr = netAddr.Next()
+	}
+
+	if serverAddr.IsValid() {
+		used[serverAddr] = true
+	}
 }

@@ -14,8 +14,9 @@ templ EditPeerPage(data EditPeerData) {
 					<p class="error">{ data.Error }</p>
 				}
 				<form method="post" action={ templ.SafeURL("/peers/" + data.Name) }>
+					@csrfInput()
 					<label>Allowed IPs</label>
-					<input name="address" value={ data.AllowedIPs } placeholder="e.g. 10.8.0.2/32, fd42:42:42::2/128"/>
+					<input name="address" value={ data.AllowedIPs } placeholder="e.g. 10.8.0.2/32, fd42::2/128"/>
 					<label>Persistent Keepalive</label>
 					<input name="keepalive" type="number" min="0" value={ strconv.Itoa(data.Keepalive) }/>
 					<h3>Client Config Overrides <small>(blank = use defaults)</small></h3>

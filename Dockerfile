@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.25-alpine AS build
+FROM golang:1.26-alpine AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN go tool templ generate
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/wg-manager ./cmd/wg-manager
+RUN CGO_ENABLED=0 go build -o /out/wg-manager ./cmd/wg-manager
 
 FROM alpine:3.23
 RUN apk add --no-cache wireguard-tools nftables iproute2 ca-certificates

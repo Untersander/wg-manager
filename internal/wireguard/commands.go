@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -101,18 +102,23 @@ func (r Runner) ShowRuntime() (map[string]PeerRuntime, error) {
 	return runtime, nil
 }
 
-func ApplyMasquerade(egressInterface string) error {
+var interfaceNameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+func ApplyMasquerade(egressInterface, subnetV4, subnetV6 string) error {
 	if strings.TrimSpace(egressInterface) == "" {
 		return errors.New("egress interface cannot be empty")
+	}
+	if len(egressInterface) > 15 || !interfaceNameRegex.MatchString(egressInterface) {
+		return fmt.Errorf("invalid interface name: %s", egressInterface)
 	}
 
 	script := fmt.Sprintf(
 		"add table inet wg_manager\n"+
 			"flush table inet wg_manager\n"+
 			"add chain inet wg_manager postrouting { type nat hook postrouting priority srcnat; policy accept; }\n"+
-			"add rule inet wg_manager postrouting oifname %q ip saddr 10.0.0.0/8 masquerade\n"+
-			"add rule inet wg_manager postrouting oifname %q ip6 saddr fd00::/8 masquerade\n",
-		egressInterface, egressInterface,
+			"add rule inet wg_manager postrouting oifname %q ip saddr %s masquerade\n"+
+			"add rule inet wg_manager postrouting oifname %q ip6 saddr %s masquerade\n",
+		egressInterface, subnetV4, egressInterface, subnetV6,
 	)
 
 	cmd := exec.Command("nft", "-f", "-")

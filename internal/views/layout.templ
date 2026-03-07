@@ -20,8 +20,7 @@ templ Layout(title string, active string) {
 				<nav class="nav-menu">
 					<a href="/" class={ templ.KV("active", active == "peers") }>Peers</a>
 					<a href="/settings" class={ templ.KV("active", active == "settings") }>Settings</a>
-					<form method="post" action="/logout">
-						<button type="submit">Logout</button>
+					<form method="post" action="/logout">					@csrfInput()						<button type="submit">Logout</button>
 					</form>
 				</nav>
 			</header>

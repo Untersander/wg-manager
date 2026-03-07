@@ -15,6 +15,7 @@ templ PeersPage(data PeersData) {
 				}
 				<div id="new-peer-form" class="hidden new-peer-form">
 					<form method="post" action="/peers">
+						@csrfInput()
 						<div class="form-row">
 							<div class="form-group">
 								<label>Name</label>

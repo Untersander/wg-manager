@@ -1,8 +1,9 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 
 	"wg-manager/internal/config"
@@ -13,29 +14,31 @@ import (
 func main() {
 	settings, err := config.Load()
 	if err != nil {
-		log.Fatalf("config error: %v", err)
+		slog.Error("config error", "error", err)
+		os.Exit(1)
 	}
 
 	if err := wireguard.EnableIPForwarding(); err != nil {
-		log.Printf("warning: ip forwarding: %v", err)
+		slog.Warn("ip forwarding failed", "error", err)
 	}
 
 	if err := wireguard.EnsureConfig(
 		settings.ConfigPath,
 		settings.ListenPort,
 		settings.MTU,
-		settings.ServerAddressV4,
-		settings.ServerAddressV6,
+		settings.SubnetV4,
+		settings.SubnetV6,
 	); err != nil {
-		log.Fatalf("failed to ensure wireguard config: %v", err)
+		slog.Error("failed to ensure wireguard config", "error", err)
+		os.Exit(1)
 	}
 
 	runner := wireguard.Runner{InterfaceName: settings.InterfaceName, ConfigPath: settings.ConfigPath}
 	if err := runner.EnsureInterfaceUp(); err != nil {
-		log.Printf("warning: failed to ensure interface up: %v", err)
+		slog.Warn("failed to ensure interface up", "error", err)
 	}
-	if err := wireguard.ApplyMasquerade(settings.EgressInterface); err != nil {
-		log.Printf("warning: failed to apply nftables masquerade: %v", err)
+	if err := wireguard.ApplyMasquerade(settings.EgressInterface, settings.SubnetV4, settings.SubnetV6); err != nil {
+		slog.Warn("failed to apply nftables masquerade", "error", err)
 	}
 
 	auth := handlers.NewAuth(settings.Password, settings.SessionCookieName)
@@ -46,7 +49,7 @@ func main() {
 
 	mux.HandleFunc("GET /login", auth.LoginGet)
 	mux.HandleFunc("POST /login", auth.LoginPost)
-	mux.HandleFunc("POST /logout", auth.Logout)
+	mux.Handle("POST /logout", auth.Require(http.HandlerFunc(auth.Logout)))
 
 	mux.Handle("GET /{$}", auth.Require(http.HandlerFunc(app.Dashboard)))
 	mux.Handle("GET /settings", auth.Require(http.HandlerFunc(app.SettingsPage)))
@@ -63,8 +66,19 @@ func main() {
 	if strings.HasPrefix(addr, ":") {
 		host = "localhost" + addr
 	}
-	log.Printf("wg-manager listening on http://%s", host)
-	if err := http.ListenAndServe(addr, mux); err != nil {
-		log.Fatalf("server stopped: %v", err)
+	slog.Info("wg-manager listening", "url", "http://"+host)
+	if err := http.ListenAndServe(addr, securityHeaders(mux)); err != nil {
+		slog.Error("server stopped", "error", err)
+		os.Exit(1)
 	}
+}
+
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self' 'unsafe-inline'")
+		next.ServeHTTP(w, r)
+	})
 }

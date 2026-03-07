@@ -100,16 +100,6 @@ tasks:
       - docker compose down -v
 
   watch:
-    desc: Watch for changes and rebuild/restart the docker-compose stack
-    watch: true
-    sources:
-      - "cmd/**/*.go"
-      - "internal/**/*.go"
-      - "internal/**/*.templ"
-      - "web/**/*"
-      - Dockerfile
-      - docker-compose.yml
-      - go.mod
-      - go.sum
+    desc: Watch for changes and rebuild using docker compose watch
     cmds:
-      - docker compose up --build
+      - docker compose watch

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -21,8 +22,8 @@ type Settings struct {
 	DefaultAllowedIPs []string
 	DefaultKeepalive  int
 	EgressInterface   string
-	ServerAddressV4   string
-	ServerAddressV6   string
+	SubnetV4          string
+	SubnetV6          string
 }
 
 func Load() (Settings, error) {
@@ -41,12 +42,16 @@ func Load() (Settings, error) {
 		return Settings{}, err
 	}
 
+	interfaceName := getEnv("WG_INTERFACE_NAME", "wg0")
+	configDir := getEnv("WG_CONFIG_PATH", "/etc/wireguard")
+	configPath := filepath.Join(configDir, interfaceName+".conf")
+
 	s := Settings{
 		HTTPAddr:          getEnv("HTTP_ADDR", ":8080"),
-		SessionCookieName: getEnv("SESSION_COOKIE", "wg-manager-session"),
-		Password:          os.Getenv("WG_PASSWORD"),
-		ConfigPath:        getEnv("WG_CONFIG_PATH", "/etc/wireguard/wg0.conf"),
-		InterfaceName:     getEnv("WG_INTERFACE_NAME", "wg0"),
+		SessionCookieName: getEnv("HTTP_SESSION_COOKIE", "wg-manager-session"),
+		Password:          os.Getenv("HTTP_PASSWORD"),
+		ConfigPath:        configPath,
+		InterfaceName:     interfaceName,
 		Host:              strings.TrimSpace(os.Getenv("WG_HOST")),
 		ListenPort:        port,
 		MTU:               mtu,
@@ -54,12 +59,12 @@ func Load() (Settings, error) {
 		DefaultAllowedIPs: splitCSV(getEnv("WG_ALLOWED_IPS", "0.0.0.0/0,::/0")),
 		DefaultKeepalive:  keepalive,
 		EgressInterface:   getEnv("WG_EGRESS_INTERFACE", "eth0"),
-		ServerAddressV4:   getEnv("WG_SERVER_ADDRESS_V4", "10.8.0.1/24"),
-		ServerAddressV6:   getEnv("WG_SERVER_ADDRESS_V6", "fd42:42:42::1/64"),
+		SubnetV4:          getEnv("WG_SUBNET_V4", "10.8.0.0/24"),
+		SubnetV6:          getEnv("WG_SUBNET_V6", "fd42::/64"),
 	}
 
 	if s.Password == "" {
-		return Settings{}, errors.New("WG_PASSWORD is required")
+		return Settings{}, errors.New("HTTP_PASSWORD is required")
 	}
 	if s.Host == "" {
 		return Settings{}, errors.New("WG_HOST is required")
