@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"net/http"
-	"os"
 	"strings"
 
 	"wg-manager/internal/config"
@@ -17,8 +16,18 @@ func main() {
 		log.Fatalf("config error: %v", err)
 	}
 
-	if _, err := os.Stat(settings.ConfigPath); err != nil {
-		log.Fatalf("wireguard config missing at %s", settings.ConfigPath)
+	if err := wireguard.EnableIPForwarding(); err != nil {
+		log.Printf("warning: ip forwarding: %v", err)
+	}
+
+	if err := wireguard.EnsureConfig(
+		settings.ConfigPath,
+		settings.ListenPort,
+		settings.MTU,
+		settings.ServerAddressV4,
+		settings.ServerAddressV6,
+	); err != nil {
+		log.Fatalf("failed to ensure wireguard config: %v", err)
 	}
 
 	runner := wireguard.Runner{InterfaceName: settings.InterfaceName, ConfigPath: settings.ConfigPath}
@@ -40,10 +49,13 @@ func main() {
 	mux.HandleFunc("POST /logout", auth.Logout)
 
 	mux.Handle("GET /{$}", auth.Require(http.HandlerFunc(app.Dashboard)))
+	mux.Handle("GET /settings", auth.Require(http.HandlerFunc(app.SettingsPage)))
 	mux.Handle("POST /settings", auth.Require(http.HandlerFunc(app.UpdateSettings)))
 	mux.Handle("POST /peers", auth.Require(http.HandlerFunc(app.CreatePeer)))
-	mux.Handle("GET /peers/{name}", auth.Require(http.HandlerFunc(app.PeerDetails)))
+	mux.Handle("GET /peers/{name}", auth.Require(http.HandlerFunc(app.EditPeer)))
+	mux.Handle("POST /peers/{name}", auth.Require(http.HandlerFunc(app.UpdatePeer)))
 	mux.Handle("GET /peers/{name}/config", auth.Require(http.HandlerFunc(app.DownloadPeerConfig)))
+	mux.Handle("GET /peers/{name}/qr", auth.Require(http.HandlerFunc(app.PeerQR)))
 	mux.Handle("POST /peers/{name}/delete", auth.Require(http.HandlerFunc(app.DeletePeer)))
 
 	addr := settings.HTTPAddr

@@ -106,18 +106,21 @@ func ApplyMasquerade(egressInterface string) error {
 		return errors.New("egress interface cannot be empty")
 	}
 
-	nftCmds := []string{
-		"add table inet wg_manager",
-		"flush table inet wg_manager",
-		"add chain inet wg_manager postrouting { type nat hook postrouting priority srcnat; policy accept; }",
-		fmt.Sprintf("add rule inet wg_manager postrouting oifname %q ip saddr 10.0.0.0/8 masquerade", egressInterface),
-		fmt.Sprintf("add rule inet wg_manager postrouting oifname %q ip6 saddr fd00::/8 masquerade", egressInterface),
-	}
+	script := fmt.Sprintf(
+		"add table inet wg_manager\n"+
+			"flush table inet wg_manager\n"+
+			"add chain inet wg_manager postrouting { type nat hook postrouting priority srcnat; policy accept; }\n"+
+			"add rule inet wg_manager postrouting oifname %q ip saddr 10.0.0.0/8 masquerade\n"+
+			"add rule inet wg_manager postrouting oifname %q ip6 saddr fd00::/8 masquerade\n",
+		egressInterface, egressInterface,
+	)
 
-	for _, cmd := range nftCmds {
-		if _, err := runCmd("nft", cmd); err != nil {
-			return err
-		}
+	cmd := exec.Command("nft", "-f", "-")
+	cmd.Stdin = strings.NewReader(script)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("nft script failed: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
 	return nil
 }

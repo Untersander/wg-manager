@@ -1,0 +1,31 @@
+package views
+
+templ LoginPage(errorMsg string) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>wg-manager login</title>
+			<link rel="stylesheet" href="/static/style.css"/>
+		</head>
+		<body>
+			<main class="centered">
+				<section class="card small">
+					<div class="logo" style="justify-content:center;margin-bottom:1rem">
+						<img src="/static/wireguard-noname.svg" alt="WireGuard"/>
+						<span>wg-manager</span>
+					</div>
+					if errorMsg != "" {
+						<p class="error">{ errorMsg }</p>
+					}
+					<form method="post" action="/login">
+						<label for="password">Password</label>
+						<input id="password" name="password" type="password" required/>
+						<button type="submit">Sign in</button>
+					</form>
+				</section>
+			</main>
+		</body>
+	</html>
+}

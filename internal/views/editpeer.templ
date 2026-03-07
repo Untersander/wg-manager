@@ -1,0 +1,31 @@
+package views
+
+import "strconv"
+
+templ EditPeerPage(data EditPeerData) {
+	@Layout("wg-manager", "peers") {
+		<main class="layout">
+			<section class="card">
+				<div class="peers-header">
+					<h2>Edit — { data.Name }</h2>
+					<a class="btn-new" href="/">← Back</a>
+				</div>
+				if data.Error != "" {
+					<p class="error">{ data.Error }</p>
+				}
+				<form method="post" action={ templ.SafeURL("/peers/" + data.Name) }>
+					<label>Allowed IPs</label>
+					<input name="address" value={ data.AllowedIPs } placeholder="e.g. 10.8.0.2/32, fd42:42:42::2/128"/>
+					<label>Persistent Keepalive</label>
+					<input name="keepalive" type="number" min="0" value={ strconv.Itoa(data.Keepalive) }/>
+					<h3>Client Config Overrides <small>(blank = use defaults)</small></h3>
+					<label>DNS Servers</label>
+					<input name="dns" value={ data.DNS } placeholder={ "default: " + data.DefaultDNS }/>
+					<label>Allowed IPs (client-side)</label>
+					<input name="client_allowed_ips" value={ data.ClientAllowedIPs } placeholder={ "default: " + data.DefaultAllowedIPs }/>
+					<button type="submit">Save</button>
+				</form>
+			</section>
+		</main>
+	}
+}

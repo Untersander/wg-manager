@@ -13,8 +13,18 @@ tasks:
 
   # ── Development ──
 
+  templ:
+    desc: Generate templ templates
+    sources:
+      - "internal/views/*.templ"
+    generates:
+      - "internal/views/*_templ.go"
+    cmds:
+      - go tool templ generate
+
   build:
     desc: Build the Go binary locally
+    deps: [templ]
     cmds:
       - go build -o bin/{{.BINARY}} ./cmd/wg-manager
 
@@ -43,6 +53,7 @@ tasks:
     desc: Run tidy, vet, and build
     cmds:
       - task: tidy
+      - task: templ
       - task: vet
       - task: build
 
@@ -94,8 +105,8 @@ tasks:
     sources:
       - "cmd/**/*.go"
       - "internal/**/*.go"
+      - "internal/**/*.templ"
       - "web/**/*"
-      - "docker/**/*"
       - Dockerfile
       - docker-compose.yml
       - go.mod

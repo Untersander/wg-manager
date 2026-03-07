@@ -14,6 +14,8 @@ type Peer struct {
 	PresharedKey        string
 	AllowedIPs          []string
 	PersistentKeepalive int
+	DNS                 []string // per-peer override; empty = use default
+	ClientAllowedIPs    []string // per-peer override; empty = use default
 }
 
 type Config struct {

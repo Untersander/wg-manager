@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/base64"
 	"fmt"
 	"net/http"
 	"slices"
@@ -10,6 +9,7 @@ import (
 	"time"
 
 	"wg-manager/internal/config"
+	"wg-manager/internal/views"
 	"wg-manager/internal/wireguard"
 
 	"github.com/skip2/go-qrcode"
@@ -39,22 +39,14 @@ func (a *App) Dashboard(w http.ResponseWriter, r *http.Request) {
 
 	runtimeByKey, _ := a.Runner.ShowRuntime()
 
-	type peerView struct {
-		Name       string
-		AllowedIPs string
-		Handshake  string
-		Rx         string
-		Tx         string
-	}
-
-	peers := make([]peerView, 0, len(cfg.Peers))
+	peers := make([]views.PeerView, 0, len(cfg.Peers))
 	for _, p := range cfg.Peers {
 		rt := runtimeByKey[p.PublicKey]
 		handshake := "never"
 		if rt.LatestHandshakeEpoch > 0 {
 			handshake = time.Unix(rt.LatestHandshakeEpoch, 0).Format(time.RFC3339)
 		}
-		peers = append(peers, peerView{
+		peers = append(peers, views.PeerView{
 			Name:       p.Name,
 			AllowedIPs: strings.Join(p.AllowedIPs, ", "),
 			Handshake:  handshake,
@@ -63,15 +55,40 @@ func (a *App) Dashboard(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	data := map[string]any{
-		"ListenPort":       cfg.Interface.ListenPort,
-		"MTU":              cfg.Interface.MTU,
-		"EgressInterface":  a.Settings.EgressInterface,
-		"DefaultKeepalive": a.Settings.DefaultKeepalive,
-		"Peers":            peers,
-		"Error":            r.URL.Query().Get("err"),
+	data := views.PeersData{
+		Peers:            peers,
+		DefaultKeepalive: a.Settings.DefaultKeepalive,
+		Error:            r.URL.Query().Get("err"),
 	}
-	_ = dashboardTemplate.Execute(w, data)
+
+	nextAddr, err := wireguard.NextAvailableAddresses(
+		a.Settings.ServerAddressV4,
+		a.Settings.ServerAddressV6,
+		cfg.Peers,
+	)
+	if err == nil {
+		data.NextAddress = nextAddr
+	}
+
+	views.PeersPage(data).Render(r.Context(), w)
+}
+
+func (a *App) SettingsPage(w http.ResponseWriter, r *http.Request) {
+	cfg, err := wireguard.LoadConfig(a.Settings.ConfigPath)
+	if err != nil {
+		http.Error(w, "failed loading config: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	data := views.SettingsData{
+		ListenPort:        cfg.Interface.ListenPort,
+		MTU:               cfg.Interface.MTU,
+		EgressInterface:   a.Settings.EgressInterface,
+		DefaultDNS:        strings.Join(a.Settings.DefaultDNS, ", "),
+		DefaultAllowedIPs: strings.Join(a.Settings.DefaultAllowedIPs, ", "),
+		Error:             r.URL.Query().Get("err"),
+	}
+	views.SettingsPage(data).Render(r.Context(), w)
 }
 
 func (a *App) CreatePeer(w http.ResponseWriter, r *http.Request) {
@@ -82,8 +99,8 @@ func (a *App) CreatePeer(w http.ResponseWriter, r *http.Request) {
 
 	name := strings.TrimSpace(r.FormValue("name"))
 	address := strings.TrimSpace(r.FormValue("address"))
-	if name == "" || address == "" {
-		http.Redirect(w, r, "/?err=name+and+address+required", http.StatusSeeOther)
+	if name == "" {
+		http.Redirect(w, r, "/?err=name+required", http.StatusSeeOther)
 		return
 	}
 
@@ -102,6 +119,19 @@ func (a *App) CreatePeer(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/?err=peer+name+exists", http.StatusSeeOther)
 			return
 		}
+	}
+
+	if address == "" {
+		autoAddr, err := wireguard.NextAvailableAddresses(
+			a.Settings.ServerAddressV4,
+			a.Settings.ServerAddressV6,
+			cfg.Peers,
+		)
+		if err != nil {
+			http.Redirect(w, r, "/?err=no+available+addresses", http.StatusSeeOther)
+			return
+		}
+		address = autoAddr
 	}
 
 	priv, pub, err := a.Runner.GenerateKeyPair()
@@ -159,25 +189,89 @@ func (a *App) DeletePeer(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-func (a *App) PeerDetails(w http.ResponseWriter, r *http.Request) {
+func (a *App) EditPeer(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	peer, clientCfg, err := a.renderablePeer(name)
+	cfg, err := wireguard.LoadConfig(a.Settings.ConfigPath)
 	if err != nil {
+		http.Error(w, "failed loading config: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var peer wireguard.Peer
+	found := false
+	for _, p := range cfg.Peers {
+		if p.Name == name {
+			peer = p
+			found = true
+			break
+		}
+	}
+	if !found {
 		http.NotFound(w, r)
 		return
 	}
 
-	png, err := qrcode.Encode(clientCfg, qrcode.Medium, 256)
-	if err != nil {
-		http.Error(w, "failed qr", http.StatusInternalServerError)
+	views.EditPeerPage(views.EditPeerData{
+		Name:              peer.Name,
+		AllowedIPs:        strings.Join(peer.AllowedIPs, ", "),
+		Keepalive:         peer.PersistentKeepalive,
+		DNS:               strings.Join(peer.DNS, ", "),
+		ClientAllowedIPs:  strings.Join(peer.ClientAllowedIPs, ", "),
+		DefaultDNS:        strings.Join(a.Settings.DefaultDNS, ", "),
+		DefaultAllowedIPs: strings.Join(a.Settings.DefaultAllowedIPs, ", "),
+		Error:             r.URL.Query().Get("err"),
+	}).Render(r.Context(), w)
+}
+
+func (a *App) UpdatePeer(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if err := r.ParseForm(); err != nil {
+		http.Redirect(w, r, "/peers/"+name+"?err=invalid+form", http.StatusSeeOther)
 		return
 	}
 
-	_ = peerTemplate.Execute(w, map[string]any{
-		"Name":   peer.Name,
-		"Config": clientCfg,
-		"QRCode": base64.StdEncoding.EncodeToString(png),
-	})
+	address := strings.TrimSpace(r.FormValue("address"))
+	keepalive, _ := strconv.Atoi(r.FormValue("keepalive"))
+	if keepalive < 0 {
+		keepalive = 0
+	}
+	dns := strings.TrimSpace(r.FormValue("dns"))
+	clientAllowedIPs := strings.TrimSpace(r.FormValue("client_allowed_ips"))
+
+	cfg, err := wireguard.LoadConfig(a.Settings.ConfigPath)
+	if err != nil {
+		http.Redirect(w, r, "/peers/"+name+"?err=failed+loading+config", http.StatusSeeOther)
+		return
+	}
+
+	found := false
+	for i, p := range cfg.Peers {
+		if p.Name == name {
+			if address != "" {
+				cfg.Peers[i].AllowedIPs = splitCSV(address)
+			}
+			cfg.Peers[i].PersistentKeepalive = keepalive
+			cfg.Peers[i].DNS = splitCSV(dns)
+			cfg.Peers[i].ClientAllowedIPs = splitCSV(clientAllowedIPs)
+			found = true
+			break
+		}
+	}
+	if !found {
+		http.Redirect(w, r, "/?err=peer+not+found", http.StatusSeeOther)
+		return
+	}
+
+	if err := wireguard.SaveConfig(a.Settings.ConfigPath, cfg); err != nil {
+		http.Redirect(w, r, "/peers/"+name+"?err=failed+saving+config", http.StatusSeeOther)
+		return
+	}
+	if err := a.Runner.SyncConfig(); err != nil {
+		http.Redirect(w, r, "/peers/"+name+"?err=failed+reloading+wireguard", http.StatusSeeOther)
+		return
+	}
+
+	http.Redirect(w, r, "/peers/"+name, http.StatusSeeOther)
 }
 
 func (a *App) DownloadPeerConfig(w http.ResponseWriter, r *http.Request) {
@@ -193,51 +287,78 @@ func (a *App) DownloadPeerConfig(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(clientCfg))
 }
 
+func (a *App) PeerQR(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	_, clientCfg, err := a.renderablePeer(name)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	png, err := qrcode.Encode(clientCfg, qrcode.Medium, 256)
+	if err != nil {
+		http.Error(w, "failed qr", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write(png)
+}
+
 func (a *App) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		http.Redirect(w, r, "/?err=invalid+form", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings?err=invalid+form", http.StatusSeeOther)
 		return
 	}
 
 	port, err := strconv.Atoi(strings.TrimSpace(r.FormValue("listen_port")))
 	if err != nil || port < 1 || port > 65535 {
-		http.Redirect(w, r, "/?err=invalid+port", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings?err=invalid+port", http.StatusSeeOther)
 		return
 	}
 	mtu, err := strconv.Atoi(strings.TrimSpace(r.FormValue("mtu")))
 	if err != nil || mtu < 1280 {
-		http.Redirect(w, r, "/?err=invalid+mtu", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings?err=invalid+mtu", http.StatusSeeOther)
 		return
 	}
 	egress := strings.TrimSpace(r.FormValue("egress_interface"))
 	if egress == "" {
-		http.Redirect(w, r, "/?err=egress+required", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings?err=egress+required", http.StatusSeeOther)
 		return
 	}
+	defaultDNS := strings.TrimSpace(r.FormValue("default_dns"))
+	defaultAllowedIPs := strings.TrimSpace(r.FormValue("default_allowed_ips"))
 
 	cfg, err := wireguard.LoadConfig(a.Settings.ConfigPath)
 	if err != nil {
-		http.Redirect(w, r, "/?err=failed+loading+config", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings?err=failed+loading+config", http.StatusSeeOther)
 		return
 	}
 	cfg.Interface.ListenPort = port
 	cfg.Interface.MTU = mtu
 
 	if err := wireguard.SaveConfig(a.Settings.ConfigPath, cfg); err != nil {
-		http.Redirect(w, r, "/?err=failed+saving+config", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings?err=failed+saving+config", http.StatusSeeOther)
 		return
 	}
 	if err := a.Runner.SyncConfig(); err != nil {
-		http.Redirect(w, r, "/?err=failed+reloading+wireguard", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings?err=failed+reloading+wireguard", http.StatusSeeOther)
 		return
 	}
 	if err := wireguard.ApplyMasquerade(egress); err != nil {
-		http.Redirect(w, r, "/?err=failed+applying+nft+rules", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings?err=failed+applying+nft+rules", http.StatusSeeOther)
 		return
 	}
 	a.Settings.EgressInterface = egress
+	if defaultDNS != "" {
+		a.Settings.DefaultDNS = splitCSV(defaultDNS)
+	}
+	if defaultAllowedIPs != "" {
+		a.Settings.DefaultAllowedIPs = splitCSV(defaultAllowedIPs)
+	}
 
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings", http.StatusSeeOther)
 }
 
 func (a *App) renderablePeer(name string) (wireguard.Peer, string, error) {
@@ -268,13 +389,22 @@ func (a *App) renderablePeer(name string) (wireguard.Peer, string, error) {
 		return wireguard.Peer{}, "", err
 	}
 
+	dns := a.Settings.DefaultDNS
+	if len(peer.DNS) > 0 {
+		dns = peer.DNS
+	}
+	allowedIPs := a.Settings.DefaultAllowedIPs
+	if len(peer.ClientAllowedIPs) > 0 {
+		allowedIPs = peer.ClientAllowedIPs
+	}
+
 	clientCfg := wireguard.BuildClientConfig(wireguard.ClientConfigInput{
 		PrivateKey:          peer.PrivateKey,
 		Address:             strings.Join(peer.AllowedIPs, ", "),
-		DNS:                 a.Settings.DefaultDNS,
+		DNS:                 dns,
 		ServerPublicKey:     serverPub,
 		Endpoint:            fmt.Sprintf("%s:%d", a.Settings.Host, cfg.Interface.ListenPort),
-		AllowedIPs:          a.Settings.DefaultAllowedIPs,
+		AllowedIPs:          allowedIPs,
 		PersistentKeepalive: peer.PersistentKeepalive,
 	})
 

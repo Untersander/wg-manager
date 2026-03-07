@@ -1,0 +1,30 @@
+package views
+
+import "strconv"
+
+templ SettingsPage(data SettingsData) {
+	@Layout("wg-manager — Settings", "settings") {
+		<main class="layout">
+			<section class="card">
+				<h2>Interface Settings</h2>
+				<form method="post" action="/settings">
+					<label>Listen Port</label>
+					<input name="listen_port" value={ strconv.Itoa(data.ListenPort) } type="number" min="1" max="65535" required/>
+					<label>MTU</label>
+					<input name="mtu" value={ strconv.Itoa(data.MTU) } type="number" min="1280" max="9000" required/>
+					<label>Egress Interface</label>
+					<input name="egress_interface" value={ data.EgressInterface } required/>
+					<h2>Client Defaults</h2>
+					<label>DNS Servers</label>
+					<input name="default_dns" value={ data.DefaultDNS } placeholder="1.1.1.1, 2606:4700:4700::1111"/>
+					<label>Allowed IPs</label>
+					<input name="default_allowed_ips" value={ data.DefaultAllowedIPs } placeholder="0.0.0.0/0, ::/0"/>
+					<button type="submit">Save Settings</button>
+				</form>
+				if data.Error != "" {
+					<p class="error">{ data.Error }</p>
+				}
+			</section>
+		</main>
+	}
+}

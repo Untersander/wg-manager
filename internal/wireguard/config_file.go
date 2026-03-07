@@ -35,6 +35,10 @@ func LoadConfig(path string) (Config, error) {
 				peer.Name = strings.TrimSpace(strings.TrimPrefix(comment, "Name ="))
 			case strings.HasPrefix(comment, "PrivateKey =") && inPeer:
 				peer.PrivateKey = strings.TrimSpace(strings.TrimPrefix(comment, "PrivateKey ="))
+			case strings.HasPrefix(comment, "DNS =") && inPeer:
+				peer.DNS = splitList(strings.TrimPrefix(comment, "DNS ="))
+			case strings.HasPrefix(comment, "ClientAllowedIPs =") && inPeer:
+				peer.ClientAllowedIPs = splitList(strings.TrimPrefix(comment, "ClientAllowedIPs ="))
 			}
 			continue
 		}
@@ -123,6 +127,12 @@ func SaveConfig(path string, cfg Config) error {
 		}
 		if peer.PrivateKey != "" {
 			_, _ = fmt.Fprintf(w, "# PrivateKey = %s\n", peer.PrivateKey)
+		}
+		if len(peer.DNS) > 0 {
+			_, _ = fmt.Fprintf(w, "# DNS = %s\n", strings.Join(peer.DNS, ", "))
+		}
+		if len(peer.ClientAllowedIPs) > 0 {
+			_, _ = fmt.Fprintf(w, "# ClientAllowedIPs = %s\n", strings.Join(peer.ClientAllowedIPs, ", "))
 		}
 		_, _ = fmt.Fprintf(w, "PublicKey = %s\n", peer.PublicKey)
 		if peer.PresharedKey != "" {

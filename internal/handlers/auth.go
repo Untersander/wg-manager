@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"net/http"
 	"sync"
+
+	"wg-manager/internal/views"
 )
 
 type Auth struct {
@@ -28,7 +30,7 @@ func (a *Auth) LoginGet(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	_ = loginTemplate.Execute(w, map[string]any{"Error": ""})
+	views.LoginPage("").Render(r.Context(), w)
 }
 
 func (a *Auth) LoginPost(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +40,7 @@ func (a *Auth) LoginPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.FormValue("password") != a.Password {
-		_ = loginTemplate.Execute(w, map[string]any{"Error": "invalid password"})
+		views.LoginPage("invalid password").Render(r.Context(), w)
 		return
 	}
 

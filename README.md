@@ -1,6 +1,6 @@
 # wg-manager
 
-Minimal Go + Docker WireGuard manager with a server-rendered web UI.
+Minimal Go + Docker WireGuard manager with a web UI.
 
 ## What It Does
 
@@ -9,10 +9,8 @@ Minimal Go + Docker WireGuard manager with a server-rendered web UI.
 - Uses `nftables` for IPv4/IPv6 masquerade.
 - Provides basic web UI for:
   - login/logout (single password)
-  - list peers
-  - create peer
-  - delete peer
-  - download client config
+  - CRUD peers
+  - download peer client config
   - scan QR code for mobile clients
   - update WireGuard port/mtu and egress interface
 
@@ -44,4 +42,3 @@ Then open `http://localhost:8080`.
 
 - The container needs `NET_ADMIN` and IP forwarding.
 - Initial config is generated automatically if missing.
-- This is an implementation starter with core flows; hardening and richer validation can be layered on top.

@@ -21,6 +21,8 @@ type Settings struct {
 	DefaultAllowedIPs []string
 	DefaultKeepalive  int
 	EgressInterface   string
+	ServerAddressV4   string
+	ServerAddressV6   string
 }
 
 func Load() (Settings, error) {
@@ -52,6 +54,8 @@ func Load() (Settings, error) {
 		DefaultAllowedIPs: splitCSV(getEnv("WG_ALLOWED_IPS", "0.0.0.0/0,::/0")),
 		DefaultKeepalive:  keepalive,
 		EgressInterface:   getEnv("WG_EGRESS_INTERFACE", "eth0"),
+		ServerAddressV4:   getEnv("WG_SERVER_ADDRESS_V4", "10.8.0.1/24"),
+		ServerAddressV6:   getEnv("WG_SERVER_ADDRESS_V6", "fd42:42:42::1/64"),
 	}
 
 	if s.Password == "" {
