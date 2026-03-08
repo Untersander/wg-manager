@@ -56,9 +56,11 @@ func (a *App) Dashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := views.PeersData{
-		Peers:            peers,
-		DefaultKeepalive: a.Settings.DefaultKeepalive,
-		Error:            r.URL.Query().Get("err"),
+		Peers:             peers,
+		DefaultKeepalive:  a.Settings.DefaultKeepalive,
+		DefaultDNS:        strings.Join(a.Settings.DefaultDNS, ", "),
+		DefaultAllowedIPs: strings.Join(a.Settings.DefaultAllowedIPs, ", "),
+		Error:             r.URL.Query().Get("err"),
 	}
 
 	nextAddr, err := wireguard.NextAvailableAddresses(
@@ -119,6 +121,21 @@ func (a *App) CreatePeer(w http.ResponseWriter, r *http.Request) {
 		keepalive = 0
 	}
 
+	dns := strings.TrimSpace(r.FormValue("dns"))
+	clientAllowedIPs := strings.TrimSpace(r.FormValue("client_allowed_ips"))
+	if dns != "" {
+		if err := validateDNSList(dns); err != nil {
+			http.Redirect(w, r, "/?err=invalid+dns", http.StatusSeeOther)
+			return
+		}
+	}
+	if clientAllowedIPs != "" {
+		if err := validateCIDRList(clientAllowedIPs); err != nil {
+			http.Redirect(w, r, "/?err=invalid+allowed+ips", http.StatusSeeOther)
+			return
+		}
+	}
+
 	cfg, err := wireguard.LoadConfig(a.Settings.ConfigPath)
 	if err != nil {
 		http.Redirect(w, r, "/?err=failed+loading+config", http.StatusSeeOther)
@@ -156,6 +173,8 @@ func (a *App) CreatePeer(w http.ResponseWriter, r *http.Request) {
 		PrivateKey:          priv,
 		AllowedIPs:          splitCSV(address),
 		PersistentKeepalive: keepalive,
+		DNS:                 splitCSV(dns),
+		ClientAllowedIPs:    splitCSV(clientAllowedIPs),
 	})
 
 	if err := wireguard.SaveConfig(a.Settings.ConfigPath, cfg); err != nil {
@@ -167,7 +186,7 @@ func (a *App) CreatePeer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/peers/"+name, http.StatusSeeOther)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (a *App) DeletePeer(w http.ResponseWriter, r *http.Request) {

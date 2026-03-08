@@ -22,10 +22,12 @@ type PeerView struct {
 }
 
 type PeersData struct {
-	Peers            []PeerView
-	DefaultKeepalive int
-	NextAddress      string
-	Error            string
+	Peers             []PeerView
+	DefaultKeepalive  int
+	NextAddress       string
+	DefaultDNS        string
+	DefaultAllowedIPs string
+	Error             string
 }
 
 type SettingsData struct {

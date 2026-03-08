@@ -99,7 +99,7 @@ spec:
             - name: WG_CLIENT_DNS
               value: "1.1.1.1,2606:4700:4700::1111"
             - name: WG_PERSISTENT_KEEPALIVE
-              value: "25"
+              value: "60"
             - name: HTTP_ADDR
               value: ":8080"
           volumeMounts:
@@ -139,7 +139,7 @@ kubectl -n wg-manager logs -f deploy/wg-manager
 - `WG_CONFIG_PATH` (default `/etc/wireguard`, resulting file is `<WG_INTERFACE_NAME>.conf`)
 - `WG_ALLOWED_IPS` (default `0.0.0.0/0,::/0`)
 - `WG_CLIENT_DNS` (default `1.1.1.1,2606:4700:4700::1111`)
-- `WG_PERSISTENT_KEEPALIVE` (default `25`)
+- `WG_PERSISTENT_KEEPALIVE` (default `60`)
 
 ## Notes
 

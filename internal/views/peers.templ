@@ -30,6 +30,16 @@ templ PeersPage(data PeersData) {
 								<input name="keepalive" type="number" min="0" value={ strconv.Itoa(data.DefaultKeepalive) }/>
 							</div>
 						</div>
+						<div class="form-row">
+							<div class="form-group">
+								<label>DNS Servers <small>(blank = use defaults)</small></label>
+								<input name="dns" placeholder={ "default: " + data.DefaultDNS }/>
+							</div>
+							<div class="form-group">
+								<label>Allowed IPs (client-side) <small>(blank = use defaults)</small></label>
+								<input name="client_allowed_ips" placeholder={ "default: " + data.DefaultAllowedIPs }/>
+							</div>
+						</div>
 						<button type="submit">Create Peer</button>
 					</form>
 				</div>

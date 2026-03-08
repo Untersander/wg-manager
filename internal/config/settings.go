@@ -37,7 +37,7 @@ func Load() (Settings, error) {
 		return Settings{}, err
 	}
 
-	keepalive, err := intFromEnv("WG_PERSISTENT_KEEPALIVE", 25)
+	keepalive, err := intFromEnv("WG_PERSISTENT_KEEPALIVE", 60)
 	if err != nil {
 		return Settings{}, err
 	}
