@@ -7,6 +7,7 @@ Minimal Go WireGuard manager with a web UI.
 - Wraps `wg` and `wg-quick` for peer management.
 - Persists config in `wg-quick` format (`/etc/wireguard/wg0.conf`) with peer metadata in comments.
 - Uses `nftables` for IPv4/IPv6 masquerade.
+- Exposes all settings via environment variables with sensible defaults.
 - Provides basic web UI for:
   - login/logout (single password)
   - CRUD peers
@@ -21,6 +22,22 @@ docker compose up --build
 ```
 
 Then open `http://localhost:8080`.
+
+## Required Environment Variables
+
+- `HTTP_PASSWORD`: UI password.
+- `WG_HOST`: Public hostname or IP used in client endpoint.
+
+## Important Variables
+
+- `WG_PORT` (default `51820`)
+- `WG_MTU` (default `1420`)
+- `WG_INTERFACE_NAME` (default `wg0`)
+- `WG_EGRESS_INTERFACE` (default `eth0`)
+- `WG_CONFIG_PATH` (default `/etc/wireguard`, resulting file is `<WG_INTERFACE_NAME>.conf`)
+- `WG_ALLOWED_IPS` (default `0.0.0.0/0,::/0`)
+- `WG_CLIENT_DNS` (default `1.1.1.1,2606:4700:4700::1111`)
+- `WG_PERSISTENT_KEEPALIVE` (default `60`)
 
 ## Kubernetes Deployment
 
@@ -125,23 +142,7 @@ kubectl -n wg-manager logs -f deploy/wg-manager
 - UI: `http://<node-ip>:8080`
 - WireGuard endpoint: `<node-ip>:51820/udp`
 
-## Required Environment Variables
-
-- `HTTP_PASSWORD`: UI password.
-- `WG_HOST`: Public hostname or IP used in client endpoint.
-
-## Important Variables
-
-- `WG_PORT` (default `51820`)
-- `WG_MTU` (default `1420`)
-- `WG_INTERFACE_NAME` (default `wg0`)
-- `WG_EGRESS_INTERFACE` (default `eth0`)
-- `WG_CONFIG_PATH` (default `/etc/wireguard`, resulting file is `<WG_INTERFACE_NAME>.conf`)
-- `WG_ALLOWED_IPS` (default `0.0.0.0/0,::/0`)
-- `WG_CLIENT_DNS` (default `1.1.1.1,2606:4700:4700::1111`)
-- `WG_PERSISTENT_KEEPALIVE` (default `60`)
-
 ## Notes
 
-- The container needs `NET_ADMIN` and IP forwarding.
+- The container needs `NET_ADMIN`, `SYS_MODULE`, and IP forwarding.
 - Initial config is generated automatically if missing.
