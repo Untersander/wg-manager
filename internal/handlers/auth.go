@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
+	"log/slog"
 	"net"
 	"net/http"
 	"sync"
@@ -51,7 +52,9 @@ func (a *Auth) LoginGet(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	views.LoginPage("").Render(r.Context(), w)
+	if err := views.LoginPage("").Render(r.Context(), w); err != nil {
+		slog.Error("failed rendering login page", "error", err)
+	}
 }
 
 func (a *Auth) LoginPost(w http.ResponseWriter, r *http.Request) {
@@ -67,7 +70,9 @@ func (a *Auth) LoginPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if subtle.ConstantTimeCompare([]byte(r.FormValue("password")), []byte(a.Password)) != 1 {
-		views.LoginPage("invalid password").Render(r.Context(), w)
+		if err := views.LoginPage("invalid password").Render(r.Context(), w); err != nil {
+			slog.Error("failed rendering login page", "error", err)
+		}
 		return
 	}
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -54,13 +55,19 @@ func (r Runner) SyncConfig() error {
 	if err := os.WriteFile(tmp, []byte(strip), 0o600); err != nil {
 		return err
 	}
-	defer os.Remove(tmp)
+	defer func() {
+		if err := os.Remove(tmp); err != nil {
+			slog.Warn("failed removing temp sync config", "path", tmp, "error", err)
+		}
+	}()
 
 	if _, err := runCmd("wg", "syncconf", r.InterfaceName, tmp); err == nil {
 		return nil
 	}
 
-	_, _ = runCmd("wg-quick", "down", r.ConfigPath)
+	if _, downErr := runCmd("wg-quick", "down", r.ConfigPath); downErr != nil {
+		slog.Warn("wg-quick down failed during sync recovery", "error", downErr)
+	}
 	_, err = runCmd("wg-quick", "up", r.ConfigPath)
 	return err
 }
@@ -86,9 +93,18 @@ func (r Runner) ShowRuntime() (map[string]PeerRuntime, error) {
 			continue
 		}
 
-		handshake, _ := strconv.ParseInt(cols[4], 10, 64)
-		rx, _ := strconv.ParseUint(cols[5], 10, 64)
-		tx, _ := strconv.ParseUint(cols[6], 10, 64)
+		handshake, err := strconv.ParseInt(cols[4], 10, 64)
+		if err != nil {
+			slog.Warn("ignoring invalid handshake value in wg dump", "value", cols[4], "error", err)
+		}
+		rx, err := strconv.ParseUint(cols[5], 10, 64)
+		if err != nil {
+			slog.Warn("ignoring invalid rx value in wg dump", "value", cols[5], "error", err)
+		}
+		tx, err := strconv.ParseUint(cols[6], 10, 64)
+		if err != nil {
+			slog.Warn("ignoring invalid tx value in wg dump", "value", cols[6], "error", err)
+		}
 
 		runtime[cols[0]] = PeerRuntime{
 			PublicKey:            cols[0],

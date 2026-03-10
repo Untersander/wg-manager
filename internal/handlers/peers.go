@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"slices"
 	"strconv"
@@ -72,7 +73,9 @@ func (a *App) Dashboard(w http.ResponseWriter, r *http.Request) {
 		data.NextAddress = nextAddr
 	}
 
-	views.PeersPage(data).Render(r.Context(), w)
+	if err := views.PeersPage(data).Render(r.Context(), w); err != nil {
+		slog.Error("failed rendering peers page", "error", err)
+	}
 }
 
 func (a *App) SettingsPage(w http.ResponseWriter, r *http.Request) {
@@ -90,7 +93,9 @@ func (a *App) SettingsPage(w http.ResponseWriter, r *http.Request) {
 		DefaultAllowedIPs: strings.Join(a.Settings.DefaultAllowedIPs, ", "),
 		Error:             r.URL.Query().Get("err"),
 	}
-	views.SettingsPage(data).Render(r.Context(), w)
+	if err := views.SettingsPage(data).Render(r.Context(), w); err != nil {
+		slog.Error("failed rendering settings page", "error", err)
+	}
 }
 
 func (a *App) CreatePeer(w http.ResponseWriter, r *http.Request) {
@@ -116,7 +121,10 @@ func (a *App) CreatePeer(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	keepalive, _ := strconv.Atoi(r.FormValue("keepalive"))
+	keepalive, err := strconv.Atoi(r.FormValue("keepalive"))
+	if err != nil {
+		keepalive = 0
+	}
 	if keepalive < 0 {
 		keepalive = 0
 	}
@@ -240,7 +248,7 @@ func (a *App) EditPeer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	views.EditPeerPage(views.EditPeerData{
+	if err := views.EditPeerPage(views.EditPeerData{
 		Name:              peer.Name,
 		AllowedIPs:        strings.Join(peer.AllowedIPs, ", "),
 		Keepalive:         peer.PersistentKeepalive,
@@ -249,7 +257,9 @@ func (a *App) EditPeer(w http.ResponseWriter, r *http.Request) {
 		DefaultDNS:        strings.Join(a.Settings.DefaultDNS, ", "),
 		DefaultAllowedIPs: strings.Join(a.Settings.DefaultAllowedIPs, ", "),
 		Error:             r.URL.Query().Get("err"),
-	}).Render(r.Context(), w)
+	}).Render(r.Context(), w); err != nil {
+		slog.Error("failed rendering edit peer page", "error", err)
+	}
 }
 
 func (a *App) UpdatePeer(w http.ResponseWriter, r *http.Request) {
@@ -260,7 +270,10 @@ func (a *App) UpdatePeer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	address := strings.TrimSpace(r.FormValue("address"))
-	keepalive, _ := strconv.Atoi(r.FormValue("keepalive"))
+	keepalive, err := strconv.Atoi(r.FormValue("keepalive"))
+	if err != nil {
+		keepalive = 0
+	}
 	if keepalive < 0 {
 		keepalive = 0
 	}
@@ -332,7 +345,9 @@ func (a *App) DownloadPeerConfig(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", name+".conf"))
-	_, _ = w.Write([]byte(clientCfg))
+	if _, err := w.Write([]byte(clientCfg)); err != nil {
+		slog.Error("failed writing peer config response", "peer", name, "error", err)
+	}
 }
 
 func (a *App) PeerQR(w http.ResponseWriter, r *http.Request) {
@@ -351,7 +366,9 @@ func (a *App) PeerQR(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "image/png")
 	w.Header().Set("Cache-Control", "no-store")
-	_, _ = w.Write(png)
+	if _, err := w.Write(png); err != nil {
+		slog.Error("failed writing QR response", "peer", name, "error", err)
+	}
 }
 
 func (a *App) UpdateSettings(w http.ResponseWriter, r *http.Request) {

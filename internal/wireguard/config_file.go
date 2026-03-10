@@ -3,18 +3,74 @@ package wireguard
 import (
 	"bufio"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 )
 
+// buildConfig renders a WireGuard config to a string.
+func buildConfig(cfg Config) string {
+	var b strings.Builder
+	mustWrite(&b, "[Interface]\n")
+	if len(cfg.Interface.Addresses) > 0 {
+		mustWrite(&b, "Address = %s\n", strings.Join(cfg.Interface.Addresses, ", "))
+	}
+	mustWrite(&b, "ListenPort = %d\n", cfg.Interface.ListenPort)
+	if cfg.Interface.MTU > 0 {
+		mustWrite(&b, "MTU = %d\n", cfg.Interface.MTU)
+	}
+	if cfg.Interface.PrivateKey != "" {
+		mustWrite(&b, "PrivateKey = %s\n", cfg.Interface.PrivateKey)
+	}
+
+	for _, peer := range cfg.Peers {
+		mustWrite(&b, "\n")
+		mustWrite(&b, "[Peer]\n")
+		if peer.Name != "" {
+			mustWrite(&b, "# Name = %s\n", peer.Name)
+		}
+		if peer.PrivateKey != "" {
+			mustWrite(&b, "# PrivateKey = %s\n", peer.PrivateKey)
+		}
+		if len(peer.DNS) > 0 {
+			mustWrite(&b, "# DNS = %s\n", strings.Join(peer.DNS, ", "))
+		}
+		if len(peer.ClientAllowedIPs) > 0 {
+			mustWrite(&b, "# ClientAllowedIPs = %s\n", strings.Join(peer.ClientAllowedIPs, ", "))
+		}
+		mustWrite(&b, "PublicKey = %s\n", peer.PublicKey)
+		if peer.PresharedKey != "" {
+			mustWrite(&b, "PresharedKey = %s\n", peer.PresharedKey)
+		}
+		if len(peer.AllowedIPs) > 0 {
+			mustWrite(&b, "AllowedIPs = %s\n", strings.Join(peer.AllowedIPs, ", "))
+		}
+		if peer.PersistentKeepalive > 0 {
+			mustWrite(&b, "PersistentKeepalive = %d\n", peer.PersistentKeepalive)
+		}
+	}
+	return b.String()
+}
+
+// mustWrite wraps fmt.Fprintf for strings.Builder which never returns an error.
+func mustWrite(b *strings.Builder, format string, args ...any) {
+	if _, err := fmt.Fprintf(b, format, args...); err != nil {
+		panic(fmt.Sprintf("strings.Builder.Write failed: %v", err))
+	}
+}
+
 func LoadConfig(path string) (Config, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return Config{}, err
 	}
-	defer f.Close()
+	defer func() {
+		if cerr := f.Close(); cerr != nil {
+			slog.Warn("failed closing config file", "path", path, "error", cerr)
+		}
+	}()
 
 	cfg := Config{}
 	section := ""
@@ -71,9 +127,17 @@ func LoadConfig(path string) (Config, error) {
 			case "PrivateKey":
 				cfg.Interface.PrivateKey = v
 			case "ListenPort":
-				cfg.Interface.ListenPort, _ = strconv.Atoi(v)
+				if n, err := strconv.Atoi(v); err != nil {
+					slog.Warn("ignoring invalid ListenPort in config", "value", v, "error", err)
+				} else {
+					cfg.Interface.ListenPort = n
+				}
 			case "MTU":
-				cfg.Interface.MTU, _ = strconv.Atoi(v)
+				if n, err := strconv.Atoi(v); err != nil {
+					slog.Warn("ignoring invalid MTU in config", "value", v, "error", err)
+				} else {
+					cfg.Interface.MTU = n
+				}
 			}
 		case "Peer":
 			switch k {
@@ -84,7 +148,11 @@ func LoadConfig(path string) (Config, error) {
 			case "AllowedIPs":
 				peer.AllowedIPs = splitList(v)
 			case "PersistentKeepalive":
-				peer.PersistentKeepalive, _ = strconv.Atoi(v)
+				if n, err := strconv.Atoi(v); err != nil {
+					slog.Warn("ignoring invalid PersistentKeepalive in config", "value", v, "error", err)
+				} else {
+					peer.PersistentKeepalive = n
+				}
 			}
 		}
 	}
@@ -101,57 +169,10 @@ func LoadConfig(path string) (Config, error) {
 
 func SaveConfig(path string, cfg Config) error {
 	tmpPath := path + ".tmp"
-	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
-	if err != nil {
-		return err
-	}
+	data := buildConfig(cfg)
 
-	w := bufio.NewWriter(f)
-	_, _ = fmt.Fprintln(w, "[Interface]")
-	if len(cfg.Interface.Addresses) > 0 {
-		_, _ = fmt.Fprintf(w, "Address = %s\n", strings.Join(cfg.Interface.Addresses, ", "))
-	}
-	_, _ = fmt.Fprintf(w, "ListenPort = %d\n", cfg.Interface.ListenPort)
-	if cfg.Interface.MTU > 0 {
-		_, _ = fmt.Fprintf(w, "MTU = %d\n", cfg.Interface.MTU)
-	}
-	if cfg.Interface.PrivateKey != "" {
-		_, _ = fmt.Fprintf(w, "PrivateKey = %s\n", cfg.Interface.PrivateKey)
-	}
-
-	for _, peer := range cfg.Peers {
-		_, _ = fmt.Fprintln(w, "")
-		_, _ = fmt.Fprintln(w, "[Peer]")
-		if peer.Name != "" {
-			_, _ = fmt.Fprintf(w, "# Name = %s\n", peer.Name)
-		}
-		if peer.PrivateKey != "" {
-			_, _ = fmt.Fprintf(w, "# PrivateKey = %s\n", peer.PrivateKey)
-		}
-		if len(peer.DNS) > 0 {
-			_, _ = fmt.Fprintf(w, "# DNS = %s\n", strings.Join(peer.DNS, ", "))
-		}
-		if len(peer.ClientAllowedIPs) > 0 {
-			_, _ = fmt.Fprintf(w, "# ClientAllowedIPs = %s\n", strings.Join(peer.ClientAllowedIPs, ", "))
-		}
-		_, _ = fmt.Fprintf(w, "PublicKey = %s\n", peer.PublicKey)
-		if peer.PresharedKey != "" {
-			_, _ = fmt.Fprintf(w, "PresharedKey = %s\n", peer.PresharedKey)
-		}
-		if len(peer.AllowedIPs) > 0 {
-			_, _ = fmt.Fprintf(w, "AllowedIPs = %s\n", strings.Join(peer.AllowedIPs, ", "))
-		}
-		if peer.PersistentKeepalive > 0 {
-			_, _ = fmt.Fprintf(w, "PersistentKeepalive = %d\n", peer.PersistentKeepalive)
-		}
-	}
-
-	if err := w.Flush(); err != nil {
-		_ = f.Close()
-		return err
-	}
-	if err := f.Close(); err != nil {
-		return err
+	if err := os.WriteFile(tmpPath, []byte(data), 0o600); err != nil {
+		return fmt.Errorf("writing config: %w", err)
 	}
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

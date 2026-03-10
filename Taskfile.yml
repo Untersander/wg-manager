@@ -47,14 +47,15 @@ tasks:
     desc: Run vet + fmt check
     cmds:
       - task: vet
-      - gofmt -l . | grep . && echo "files need formatting" && exit 1 || true
+      - task: fmt
+      - golangci-lint run --timeout 5m
 
   check:
-    desc: Run tidy, vet, and build
+    desc: Run tidy, lint, and build
     cmds:
       - task: tidy
       - task: templ
-      - task: vet
+      - task: lint
       - task: build
 
   clean:
@@ -77,7 +78,8 @@ tasks:
   restart:
     desc: Restart docker-compose stack
     cmds:
-      - docker compose restart
+      - task: down
+      - task: up
 
   logs:
     desc: Tail docker-compose logs

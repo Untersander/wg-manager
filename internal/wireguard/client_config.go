@@ -1,7 +1,6 @@
 package wireguard
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -17,20 +16,20 @@ type ClientConfigInput struct {
 
 func BuildClientConfig(in ClientConfigInput) string {
 	b := &strings.Builder{}
-	_, _ = fmt.Fprintln(b, "[Interface]")
-	_, _ = fmt.Fprintf(b, "PrivateKey = %s\n", in.PrivateKey)
-	_, _ = fmt.Fprintf(b, "Address = %s\n", in.Address)
+	mustWrite(b, "[Interface]\n")
+	mustWrite(b, "PrivateKey = %s\n", in.PrivateKey)
+	mustWrite(b, "Address = %s\n", in.Address)
 	if len(in.DNS) > 0 {
-		_, _ = fmt.Fprintf(b, "DNS = %s\n", strings.Join(in.DNS, ", "))
+		mustWrite(b, "DNS = %s\n", strings.Join(in.DNS, ", "))
 	}
 
-	_, _ = fmt.Fprintln(b, "")
-	_, _ = fmt.Fprintln(b, "[Peer]")
-	_, _ = fmt.Fprintf(b, "PublicKey = %s\n", in.ServerPublicKey)
-	_, _ = fmt.Fprintf(b, "AllowedIPs = %s\n", strings.Join(in.AllowedIPs, ", "))
-	_, _ = fmt.Fprintf(b, "Endpoint = %s\n", in.Endpoint)
+	mustWrite(b, "\n")
+	mustWrite(b, "[Peer]\n")
+	mustWrite(b, "PublicKey = %s\n", in.ServerPublicKey)
+	mustWrite(b, "AllowedIPs = %s\n", strings.Join(in.AllowedIPs, ", "))
+	mustWrite(b, "Endpoint = %s\n", in.Endpoint)
 	if in.PersistentKeepalive > 0 {
-		_, _ = fmt.Fprintf(b, "PersistentKeepalive = %d\n", in.PersistentKeepalive)
+		mustWrite(b, "PersistentKeepalive = %d\n", in.PersistentKeepalive)
 	}
 
 	return b.String()
