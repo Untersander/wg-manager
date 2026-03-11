@@ -91,15 +91,24 @@ tasks:
     cmds:
       - docker compose ps
 
-  docker-build:
-    desc: Build the Docker image only
+  docker-buildx-setup:
+    desc: Set up Docker Buildx for multi-arch builds
     cmds:
-      - docker build -t {{.IMAGE}} .
+      - docker buildx rm --keep-state local || true
+      - docker buildx create --use --name local
+      - docker buildx inspect --bootstrap
 
-  docker-clean:
-    desc: Stop stack and remove volumes
+  docker-build:
+    desc: Build Container images using Buildx
     cmds:
-      - docker compose down -v
+      - docker buildx use local
+      - docker buildx build -t {{.IMAGE}} --load .
+
+  docker-build-multiarch:
+    desc: Build multi-arch Container images using Buildx
+    cmds:
+      - docker buildx use local
+      - docker buildx build --platform linux/amd64,linux/arm64 -t {{.IMAGE}} .
 
   watch:
     desc: Watch for changes and rebuild using docker compose watch
