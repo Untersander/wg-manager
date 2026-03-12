@@ -28,6 +28,18 @@ tasks:
     cmds:
       - go build -o bin/{{.BINARY}} ./cmd/wg-manager
 
+  test:
+    desc: Run Go tests
+    deps: [templ]
+    cmds:
+      - go test ./...
+
+  test-verbose:
+    desc: Run Go tests with verbose output
+    deps: [templ]
+    cmds:
+      - go test -v ./...
+
   vet:
     desc: Run go vet
     cmds:

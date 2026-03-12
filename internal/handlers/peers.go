@@ -19,7 +19,7 @@ import (
 
 type App struct {
 	Settings config.Settings
-	Runner   wireguard.Runner
+	Runner   RunnerIface
 }
 
 func NewApp(settings config.Settings) *App {
