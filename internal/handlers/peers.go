@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -51,8 +52,8 @@ func (a *App) Dashboard(w http.ResponseWriter, r *http.Request) {
 			Name:       p.Name,
 			AllowedIPs: strings.Join(p.AllowedIPs, ", "),
 			Handshake:  handshake,
-			Rx:         fmt.Sprintf("%d", rt.TransferRx),
-			Tx:         fmt.Sprintf("%d", rt.TransferTx),
+			Rx:         formatBytes(rt.TransferRx),
+			Tx:         formatBytes(rt.TransferTx),
 		})
 	}
 
@@ -75,6 +76,43 @@ func (a *App) Dashboard(w http.ResponseWriter, r *http.Request) {
 
 	if err := views.PeersPage(data).Render(r.Context(), w); err != nil {
 		slog.Error("failed rendering peers page", "error", err)
+	}
+}
+
+func (a *App) Stats(w http.ResponseWriter, r *http.Request) {
+	cfg, err := wireguard.LoadConfig(a.Settings.ConfigPath)
+	if err != nil {
+		http.Error(w, "failed loading config", http.StatusInternalServerError)
+		return
+	}
+
+	runtimeByKey, _ := a.Runner.ShowRuntime()
+
+	type PeerStat struct {
+		Name      string `json:"name"`
+		Rx        string `json:"rx"`
+		Tx        string `json:"tx"`
+		Handshake string `json:"handshake"`
+	}
+
+	stats := make([]PeerStat, 0, len(cfg.Peers))
+	for _, p := range cfg.Peers {
+		rt := runtimeByKey[p.PublicKey]
+		handshake := "never"
+		if rt.LatestHandshakeEpoch > 0 {
+			handshake = time.Unix(rt.LatestHandshakeEpoch, 0).Format(time.RFC3339)
+		}
+		stats = append(stats, PeerStat{
+			Name:      p.Name,
+			Rx:        formatBytes(rt.TransferRx),
+			Tx:        formatBytes(rt.TransferTx),
+			Handshake: handshake,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(stats); err != nil {
+		slog.Error("failed encoding stats", "error", err)
 	}
 }
 
@@ -503,4 +541,20 @@ func splitCSV(v string) []string {
 		}
 	}
 	return out
+}
+
+func formatBytes(b uint64) string {
+	if b == 0 {
+		return "0 B"
+	}
+	const unit = 1024
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
 }

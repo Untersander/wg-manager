@@ -55,6 +55,7 @@ func main() {
 	mux.Handle("GET /settings", auth.Require(http.HandlerFunc(app.SettingsPage)))
 	mux.Handle("POST /settings", auth.Require(http.HandlerFunc(app.UpdateSettings)))
 	mux.Handle("POST /peers", auth.Require(http.HandlerFunc(app.CreatePeer)))
+	mux.Handle("GET /api/stats", auth.Require(http.HandlerFunc(app.Stats)))
 	mux.Handle("GET /peers/{name}", auth.Require(http.HandlerFunc(app.EditPeer)))
 	mux.Handle("POST /peers/{name}", auth.Require(http.HandlerFunc(app.UpdatePeer)))
 	mux.Handle("GET /peers/{name}/config", auth.Require(http.HandlerFunc(app.DownloadPeerConfig)))
