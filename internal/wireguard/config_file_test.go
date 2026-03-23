@@ -36,7 +36,10 @@ func TestLoadConfig(t *testing.T) {
 	if _, err := f.WriteString(sampleConfig); err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
+
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
 
 	cfg, err := LoadConfig(f.Name())
 	if err != nil {

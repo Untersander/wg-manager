@@ -69,6 +69,7 @@ tasks:
       - task: templ
       - task: lint
       - task: build
+      - task: test
 
   clean:
     desc: Remove build artifacts
