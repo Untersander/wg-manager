@@ -2,6 +2,8 @@
 
 Minimal Go WireGuard manager with a web UI.
 
+![wg-manager screenshot](./docs/images/peers-dash.png)
+
 ## What It Does
 
 - Wraps `wg` and `wg-quick` for peer management.
