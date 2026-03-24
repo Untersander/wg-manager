@@ -15,7 +15,7 @@ func NextAvailableIP(serverCIDR string, usedCIDRs []string) (string, error) {
 		return "", fmt.Errorf("parsing server CIDR %q: %w", serverCIDR, err)
 	}
 
-	used := map[netip.Addr]bool{}
+	used := make(map[netip.Addr]struct{}, len(usedCIDRs)+1)
 	reserveServerAddress(prefix, used)
 	for _, cidr := range usedCIDRs {
 		p, err := netip.ParsePrefix(cidr)
@@ -24,10 +24,10 @@ func NextAvailableIP(serverCIDR string, usedCIDRs []string) (string, error) {
 			if err2 != nil {
 				continue
 			}
-			used[a] = true
+			used[a] = struct{}{}
 			continue
 		}
-		used[p.Addr()] = true
+		used[p.Addr()] = struct{}{}
 	}
 
 	networkAddr := networkAddress(prefix)
@@ -37,7 +37,7 @@ func NextAvailableIP(serverCIDR string, usedCIDRs []string) (string, error) {
 	candidate := networkAddr.Next()
 	last := broadcastAddr
 	for candidate.IsValid() && candidate.Less(last) {
-		if !used[candidate] {
+		if _, exists := used[candidate]; !exists {
 			return fmt.Sprintf("%s/%d", candidate.String(), prefix.Addr().BitLen()), nil
 		}
 		candidate = candidate.Next()
@@ -86,7 +86,8 @@ func broadcastAddress(prefix netip.Prefix) netip.Addr {
 // NextAvailableAddresses returns "v4/32, v6/128" for a new peer,
 // picking the next free host in each server subnet.
 func NextAvailableAddresses(serverV4, serverV6 string, peers []Peer) (string, error) {
-	var usedV4, usedV6 []string
+	usedV4 := make([]string, 0, len(peers)*2)
+	usedV6 := make([]string, 0, len(peers)*2)
 	for _, p := range peers {
 		for _, a := range p.AllowedIPs {
 			pref, err := netip.ParsePrefix(a)
@@ -120,14 +121,14 @@ func nextHost(serverCIDR string, usedCIDRs []string) (string, error) {
 		return "", fmt.Errorf("parsing %q: %w", serverCIDR, err)
 	}
 
-	used := map[netip.Addr]bool{}
+	used := make(map[netip.Addr]struct{}, len(usedCIDRs)+1)
 	reserveServerAddress(prefix, used)
 	for _, cidr := range usedCIDRs {
 		p, err := netip.ParsePrefix(cidr)
 		if err != nil {
 			continue
 		}
-		used[p.Addr()] = true
+		used[p.Addr()] = struct{}{}
 	}
 
 	net := networkAddress(prefix)
@@ -135,20 +136,22 @@ func nextHost(serverCIDR string, usedCIDRs []string) (string, error) {
 
 	candidate := net.Next()
 	for candidate.IsValid() && candidate.Less(bcast) {
-		if !used[candidate] {
+		if _, exists := used[candidate]; !exists {
 			return candidate.String(), nil
 		}
 		candidate = candidate.Next()
 	}
 	// for v6, also check the broadcast address itself (v6 doesn't have broadcast)
-	if prefix.Addr().Is6() && !used[bcast] {
-		return bcast.String(), nil
+	if prefix.Addr().Is6() {
+		if _, exists := used[bcast]; !exists {
+			return bcast.String(), nil
+		}
 	}
 
 	return "", fmt.Errorf("no available IPs in %s", serverCIDR)
 }
 
-func reserveServerAddress(prefix netip.Prefix, used map[netip.Addr]bool) {
+func reserveServerAddress(prefix netip.Prefix, used map[netip.Addr]struct{}) {
 	netAddr := networkAddress(prefix)
 	serverAddr := prefix.Addr()
 
@@ -159,6 +162,6 @@ func reserveServerAddress(prefix netip.Prefix, used map[netip.Addr]bool) {
 	}
 
 	if serverAddr.IsValid() {
-		used[serverAddr] = true
+		used[serverAddr] = struct{}{}
 	}
 }
