@@ -20,7 +20,7 @@ tasks:
     generates:
       - "internal/views/*_templ.go"
     cmds:
-      - go tool templ generate
+      - go tool templ generate --force
 
   build:
     desc: Build the Go binary locally
